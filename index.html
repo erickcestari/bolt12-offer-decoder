@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BOLT12 Offer Decoder</title>
+  <link data-trunk rel="rust" />
+  <style>
+    html, body { 
+      margin: 0; 
+      height: 100%; 
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background-color: #222;
+    }
+    canvas { 
+      width: 100%; 
+      height: 100%; 
+      display: block;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      font-size: 18px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading BOLT12 Offer Decoder...</div>
+  <canvas id="bolt12_offer_canvas" style="display: none;"></canvas>
+  
+  <script type="module">
+    window.addEventListener("TrunkApplicationStarted", async (event) => {
+      try {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('bolt12_offer_canvas').style.display = 'block';
+        
+        await window.wasmBindings.start_app('bolt12_offer_canvas');
+      } catch (error) {
+        console.error('Failed to start app:', error);
+        document.getElementById('loading').textContent = 'Failed to load application: ' + error;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('bolt12_offer_canvas').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

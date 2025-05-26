@@ -1,0 +1,15 @@
+[package]
+name = "bolt12_offer_decoder"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "bolt12_offer_decoder"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+eframe = "0.31.1"
+lightning = "0.1.4"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
