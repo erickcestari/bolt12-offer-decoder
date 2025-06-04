@@ -1,5 +1,11 @@
 use eframe::egui;
-use lightning::offers::offer::{Amount, Offer, Quantity};
+use lightning::{
+    bitcoin::bech32::{NoChecksum, primitives::decode::CheckedHrpstring},
+    offers::{
+        offer::{Amount, Offer, Quantity},
+        parse::Bolt12ParseError,
+    },
+};
 use std::str::FromStr;
 
 struct Theme {
@@ -22,6 +28,54 @@ impl Default for Theme {
             dark_bg: egui::Color32::from_rgb(25, 25, 35),
         }
     }
+}
+
+const BECH32_HRP: &'static str = "lno";
+
+// Used to avoid copying a bech32 string not containing the continuation character (+).
+enum Bech32String<'a> {
+    Borrowed(&'a str),
+    Owned(String),
+}
+
+impl<'a> AsRef<str> for Bech32String<'a> {
+    fn as_ref(&self) -> &str {
+        match self {
+            Bech32String::Borrowed(s) => s,
+            Bech32String::Owned(s) => s,
+        }
+    }
+}
+
+fn from_bech32_str(s: &str) -> Result<Vec<u8>, Bolt12ParseError> {
+    // Offer encoding may be split by '+' followed by optional whitespace.
+    let encoded = match s.split('+').skip(1).next() {
+        Some(_) => {
+            for chunk in s.split('+') {
+                let chunk = chunk.trim_start();
+                if chunk.is_empty() || chunk.contains(char::is_whitespace) {
+                    return Err(Bolt12ParseError::InvalidContinuation);
+                }
+            }
+
+            let s: String = s
+                .chars()
+                .filter(|c| *c != '+' && !c.is_whitespace())
+                .collect();
+            Bech32String::Owned(s)
+        }
+        None => Bech32String::Borrowed(s),
+    };
+
+    let parsed = CheckedHrpstring::new::<NoChecksum>(encoded.as_ref())?;
+    let hrp = parsed.hrp();
+    // Compare the lowercase'd iter to allow for all-uppercase HRPs
+    if hrp.lowercase_char_iter().ne(BECH32_HRP.chars()) {
+        return Err(Bolt12ParseError::InvalidBech32Hrp);
+    }
+
+    let data = parsed.byte_iter().collect::<Vec<u8>>();
+    Ok(data)
 }
 
 pub struct Bolt12OfferDecoderApp {
@@ -65,15 +119,31 @@ impl eframe::App for Bolt12OfferDecoderApp {
             ui.add_space(20.0);
             self.display_title(ui);
             self.display_text_field(ui);
+
             ui.add_space(20.0);
+            match from_bech32_str(&self.input_text) {
+                Ok(data_part) => {
+                    let data_part_str = data_part
+                        .iter()
+                        .map(|d| format!("{:02x}", d))
+                        .collect::<Vec<_>>()
+                        .join("");
+                    let title = egui::RichText::new(format!("data part: {}", data_part_str))
+                        .size(12.0)
+                        .color(self.theme.secondary_accent_color)
+                        .strong();
+                    ui.label(title);
+                }
+                Err(_) => {}
+            }
+            if let Some(offer) = &self.offer {
+                self.display_offer(ui, offer);
+            }
 
             if let Some(error) = &self.error_message {
                 self.display_error(ui, error);
             }
 
-            if let Some(offer) = &self.offer {
-                self.display_offer(ui, offer);
-            }
             ui.add_space(30.0);
             self.display_footer(ui);
         });
